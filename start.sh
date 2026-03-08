@@ -126,8 +126,10 @@ def extract_zip(zip_path, extract_dir):
 
 
 def get_audio_duration(audio_path):
+    import shutil as _shutil
+    ffprobe_path = _shutil.which('ffprobe') or 'ffprobe'
     result = subprocess.run(
-        ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_streams', audio_path],
+        [ffprobe_path, '-v', 'quiet', '-print_format', 'json', '-show_streams', audio_path],
         capture_output=True, text=True
     )
     info = json.loads(result.stdout)
@@ -350,7 +352,7 @@ def process(zip_file, bg_image, visualizer_type, video_quality, resolution, prog
             for af in audio_files:
                 f.write(f"file '{af}'\n")
         combined_audio = os.path.join(work_dir, "combined.wav")
-        subprocess.run(['ffmpeg', '-y', '-f', 'concat', '-safe', '0',
+        subprocess.run([VIDEO_ENCODER, '-y', '-f', 'concat', '-safe', '0',
             '-i', concat_list, '-ar', '44100', '-ac', '2', combined_audio],
             check=True, capture_output=True)
 
