@@ -24,7 +24,7 @@ ldconfig 2>/dev/null || true
 # Install ffmpeg with NVENC support via static build.
 # Use an actual encode test (not just encoder list) to avoid false positives:
 # apt-built ffmpeg may list h264_nvenc but fail to encode without the NVIDIA runtime.
-if ! ffmpeg -hide_banner -f lavfi -i color=black:s=128x128:d=1 -c:v h264_nvenc -f null - &>/dev/null 2>&1; then
+if ! ffmpeg -hide_banner -f lavfi -i color=black:s=256x144:d=1 -c:v h264_nvenc -f null - &>/dev/null 2>&1; then
     echo "Installing ffmpeg with NVENC support..."
     apt-get install -y -qq wget xz-utils
     wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
@@ -48,12 +48,12 @@ fi
 
 echo "===== Verifying NVENC ====="
 echo "ffmpeg path: $(which ffmpeg)"
-if ffmpeg -hide_banner -f lavfi -i color=black:s=128x128:d=1 -c:v h264_nvenc -f null - &>/dev/null 2>&1; then
+if ffmpeg -hide_banner -f lavfi -i color=black:s=256x144:d=1 -c:v h264_nvenc -f null - &>/dev/null 2>&1; then
     echo "NVENC OK - GPU encoding active"
 else
     echo "NVENC FAILED - CPU encoding will be used"
     echo "--- NVENC error output ---"
-    ffmpeg -hide_banner -f lavfi -i color=black:s=128x128:d=1 -c:v h264_nvenc -f null - 2>&1 | tail -8
+    ffmpeg -hide_banner -f lavfi -i color=black:s=256x144:d=1 -c:v h264_nvenc -f null - 2>&1 | tail -8
     echo "--------------------------"
 fi
 
@@ -98,7 +98,7 @@ def detect_gpu_encoder():
     print(f"[NVENC] ffmpeg path: {ffmpeg_path}", flush=True)
     try:
         test = subprocess.run(
-            [ffmpeg_path, '-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=128x128:d=1',
+            [ffmpeg_path, '-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=256x144:d=1',
              '-c:v', 'h264_nvenc', '-f', 'null', '-'],
             capture_output=True, text=True, timeout=15
         )
