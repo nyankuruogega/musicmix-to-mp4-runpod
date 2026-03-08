@@ -51,7 +51,7 @@
      fi
 
      echo "===== Writing app ====="
-     cat > /app.py << 'PYEOF'
+     
      import os
      import sys
      import types
