@@ -412,7 +412,7 @@ gpu_color = "#34d399" if USING_GPU else "#f59e0b"
 # Shared state: path to the generated background image
 generated_bg_path = gr.State(None)
 
-with gr.Blocks(css=css, title="Music to MP4") as demo:
+with gr.Blocks(title="Music to MP4") as demo:
     gr.HTML(f"""
         <h1 class='app-title'>Music to MP4</h1>
         <p class='subtitle'>ZIP of songs → MP4 video + AI background + YouTube metadata</p>
@@ -552,7 +552,7 @@ with gr.Blocks(css=css, title="Music to MP4") as demo:
                     output_description = gr.Textbox(label="YouTube Description", lines=20, interactive=True)
             ai_btn.click(fn=run_ai_metadata, inputs=[groq_key, mix_type, channel_name], outputs=[output_titles, output_description])
 
-demo.launch(server_name="0.0.0.0", server_port=7860, show_api=False)
+demo.launch(server_name="0.0.0.0", server_port=7860, css=css)
 PYEOF
 
 echo "===== Launching app ====="
