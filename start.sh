@@ -94,22 +94,37 @@ STYLE_PRESETS = {
 # ── Encoder detection ──────────────────────────────────────────────────────────
 def detect_gpu_encoder():
     import shutil as _shutil
-    ffmpeg_path = _shutil.which('ffmpeg') or 'ffmpeg'
-    print(f"[NVENC] ffmpeg path: {ffmpeg_path}", flush=True)
-    try:
-        test = subprocess.run(
-            [ffmpeg_path, '-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=256x144:d=1',
-             '-c:v', 'h264_nvenc', '-f', 'null', '-'],
-            capture_output=True, text=True, timeout=15
-        )
-        print(f"[NVENC] returncode: {test.returncode}", flush=True)
-        if test.returncode != 0:
-            print(f"[NVENC] stderr: {test.stderr[-500:]}", flush=True)
-        if test.returncode == 0:
-            return ffmpeg_path, True
-    except Exception as e:
-        print(f"[NVENC] exception: {e}", flush=True)
-    return ffmpeg_path, False
+
+    # Try multiple ffmpeg paths in order of preference
+    candidates = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', _shutil.which('ffmpeg') or 'ffmpeg']
+    # Deduplicate while preserving order
+    seen = set()
+    ffmpeg_candidates = [x for x in candidates if x and not (x in seen or seen.add(x))]
+
+    for ffmpeg_path in ffmpeg_candidates:
+        import os
+        if not os.path.exists(ffmpeg_path) and ffmpeg_path not in ('ffmpeg',):
+            continue
+        print(f"[NVENC] trying: {ffmpeg_path}", flush=True)
+        try:
+            test = subprocess.run(
+                [ffmpeg_path, '-hide_banner', '-f', 'lavfi', '-i', 'color=black:s=256x144:d=1',
+                 '-c:v', 'h264_nvenc', '-f', 'null', '-'],
+                capture_output=True, text=True, timeout=15
+            )
+            print(f"[NVENC] returncode: {test.returncode}", flush=True)
+            if test.returncode == 0:
+                print(f"[NVENC] success with: {ffmpeg_path}", flush=True)
+                return ffmpeg_path, True
+            else:
+                print(f"[NVENC] failed: {test.stderr[-200:]}", flush=True)
+        except Exception as e:
+            print(f"[NVENC] exception: {e}", flush=True)
+
+    # Fall back to first available ffmpeg for CPU encoding
+    fallback = _shutil.which('ffmpeg') or 'ffmpeg'
+    print(f"[NVENC] no NVENC found, using CPU: {fallback}", flush=True)
+    return fallback, False
 
 
 # ── Audio helpers ──────────────────────────────────────────────────────────────
