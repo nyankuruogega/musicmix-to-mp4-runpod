@@ -15,7 +15,20 @@
 set -e
 
 echo "===== Installing system dependencies ====="
-apt-get update -qq && apt-get install -y -qq ffmpeg
+apt-get update -qq && apt-get install -y -qq ffmpeg nvidia-cuda-toolkit 2>/dev/null || true
+
+# Install ffmpeg with NVENC support via static build
+if ! ffmpeg -hide_banner -encoders 2>&1 | grep -q h264_nvenc; then
+    echo "Installing ffmpeg with NVENC support..."
+    apt-get install -y -qq wget xz-utils
+    wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+    tar -xf ffmpeg-release-amd64-static.tar.xz
+    cp ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/ffmpeg
+    cp ffmpeg-*-amd64-static/ffprobe /usr/local/bin/ffprobe
+    chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe
+    rm -rf ffmpeg-*-amd64-static*
+    echo "ffmpeg with NVENC installed"
+fi
 
 echo "===== Installing Python packages ====="
 pip install -q gradio groq torch torchvision diffusers transformers accelerate sentencepiece protobuf huggingface_hub
