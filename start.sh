@@ -387,7 +387,41 @@ def process(zip_file, bg_image, visualizer_type, video_quality, resolution, prog
             filter_complex = f"{bg_filter};[bg]setpts=PTS-STARTPTS[outv]" if bg_image else f"{bg_filter}[outv]"
 
         encoder_label = "GPU (NVENC)" if USING_GPU else "CPU"
-        progress(0.4, desc=f"Rendering MP4 with {encoder_label}...")
+        progress(0.4, desc=f"Rendering MP4 with {encoder_label}... (0%)")
+
+        # Get total duration for progress calculation
+        total_seconds = sum(d for _, _, d in tracks)
+
+        def run_ffmpeg_with_progress(cmd, progress, start_pct=0.4, end_pct=0.93, label=""):
+            import re
+            proc = subprocess.Popen(
+                cmd,
+                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                text=True,
+                bufsize=1
+            )
+            stderr_lines = []
+            time_pattern = re.compile(r'time=(\d+):(\d+):(\d+\.\d+)')
+            current_pct = start_pct
+            while True:
+                line = proc.stderr.readline()
+                if not line and proc.poll() is not None:
+                    break
+                if line:
+                    stderr_lines.append(line)
+                    m = time_pattern.search(line)
+                    if m and total_seconds > 0:
+                        h, m2, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                        elapsed = h * 3600 + m2 * 60 + s
+                        ratio = min(elapsed / total_seconds, 1.0)
+                        current_pct = start_pct + ratio * (end_pct - start_pct)
+                        pct_display = int(ratio * 100)
+                        elapsed_fmt = f"{int(elapsed//3600):02d}:{int((elapsed%3600)//60):02d}:{int(elapsed%60):02d}"
+                        total_fmt = f"{int(total_seconds//3600):02d}:{int((total_seconds%3600)//60):02d}:{int(total_seconds%60):02d}"
+                        progress(current_pct, desc=f"Rendering with {label}... {pct_display}% ({elapsed_fmt} / {total_fmt})")
+            proc.wait()
+            return proc.returncode, "".join(stderr_lines)
 
         cmd = [VIDEO_ENCODER, '-y', *bg_input, '-i', combined_audio,
             '-filter_complex', filter_complex,
@@ -395,19 +429,19 @@ def process(zip_file, bg_image, visualizer_type, video_quality, resolution, prog
             *encode_params,
             '-c:a', 'aac', '-b:a', '192k', '-shortest', output_path]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        returncode, stderr_output = run_ffmpeg_with_progress(cmd, progress, label=encoder_label)
 
-        if result.returncode != 0 and USING_GPU:
+        if returncode != 0 and USING_GPU:
             progress(0.4, desc="GPU encode failed, retrying with CPU...")
             cpu_cmd = [VIDEO_ENCODER, '-y', *bg_input, '-i', combined_audio,
                 '-filter_complex', filter_complex,
                 '-map', '[outv]', '-map', f'{audio_input_idx}:a',
                 '-c:v', 'libx264', '-crf', '23', '-preset', 'fast', '-threads', '0',
                 '-c:a', 'aac', '-b:a', '192k', '-shortest', output_path]
-            result = subprocess.run(cpu_cmd, capture_output=True, text=True)
+            returncode, stderr_output = run_ffmpeg_with_progress(cpu_cmd, progress, label="CPU fallback")
 
-        if result.returncode != 0:
-            raise gr.Error(f"FFmpeg error:\n{result.stderr[-1000:]}")
+        if returncode != 0:
+            raise gr.Error(f"FFmpeg error:\n{stderr_output[-1000:]}")
 
         progress(0.95, desc="Finalizing...")
         final_output = os.path.join(tempfile.gettempdir(), "music_video_output.mp4")
